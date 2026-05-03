@@ -1,6 +1,9 @@
 # oc-clink-completions
 
 [![Tests](https://github.com/maximunited/oc-clink-completions/actions/workflows/test.yml/badge.svg)](https://github.com/maximunited/oc-clink-completions/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows&logoColor=white)](https://chrisant996.github.io/clink/)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-maxim__united-orange?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/maxim_united)
 
 [Clink](https://chrisant996.github.io/clink/) tab-completion script for the OpenShift CLI (`oc` / `oc.exe`).
 
