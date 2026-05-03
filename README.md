@@ -4,18 +4,20 @@
 
 ## What it does
 
-Provides tab-completion for top-level `oc` subcommands in any Clink-enhanced `cmd.exe` session:
+Three levels of tab-completion in any Clink-enhanced `cmd.exe` session:
 
-```
-oc <TAB>
-adm          annotate     apply        autoscale    cancel-build
-create       delete       describe     edit         exec
-explain      expose       get          image        import-image
-label        login        logout       logs         new-app
-new-build    new-project  policy       project      registry
-rollback     rollout      scale        secrets      serviceaccounts
-set          start-build  status       tag          whoami
-```
+| What you type | `<TAB>` completes |
+|---|---|
+| `oc <TAB>` | all subcommands |
+| `oc get <TAB>` | resource types (`pods`, `svc`, `deploy`, `dc`, …) |
+| `oc get pods <TAB>` | live pod names from the cluster |
+| `oc logs <TAB>` | live pod names directly |
+| `oc scale deployment <TAB>` | live deployment names |
+| `oc rollout status <TAB>` | scalable resource types |
+| `oc get pods -n <TAB>` | live project/namespace names |
+| `oc get pods --namespace <TAB>` | live project/namespace names |
+
+Resource names and namespace names are fetched live via `oc get <resource> -o name`. Completions return empty gracefully when the cluster is unreachable.
 
 ## Requirements
 
@@ -24,27 +26,13 @@ set          start-build  status       tag          whoami
 
 ## Installation
 
-Clone the repo, then link `oc.lua` into your Clink scripts directory so changes pulled from git take effect immediately.
+Clone the repo, then create a symbolic link so any `git pull` is immediately live in Clink with no extra steps.
 
-**Option A — hard link (no admin required, recommended):**
+Run the following in an **elevated cmd** (right-click → Run as administrator):
 
-```powershell
+```cmd
 git clone https://github.com/maximunited/oc-clink-completions
-New-Item -ItemType HardLink `
-  -Path "$env:LOCALAPPDATA\clink\oc.lua" `
-  -Target "$PWD\oc-clink-completions\oc.lua"
-```
-
-> **Note:** Hard links share the same file data on disk, so in-place edits are reflected immediately. However, `git pull` replaces the file inode, which breaks the link — re-run the `New-Item` command after pulling to restore it.
-
-**Option B — symbolic link (survives `git pull`, requires admin or Developer Mode):**
-
-```powershell
-# Run PowerShell as Administrator, or enable Settings → Developer Mode first
-git clone https://github.com/maximunited/oc-clink-completions
-New-Item -ItemType SymbolicLink `
-  -Path "$env:LOCALAPPDATA\clink\oc.lua" `
-  -Target "$PWD\oc-clink-completions\oc.lua"
+mklink "%LOCALAPPDATA%\clink\oc.lua" "%CD%\oc-clink-completions\oc.lua"
 ```
 
 Restart your `cmd.exe` session (or run `clink reload`) to pick up the script.
