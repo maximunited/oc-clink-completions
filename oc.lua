@@ -1,19 +1,109 @@
 -- oc.lua
--- 1. Define the command set as a simple table
-local oc_cmds = {
-    "get", "describe", "logs", "exec", "project", "new-project", 
-    "status", "explain", "apply", "create", "delete", "edit",
-    "adm", "image", "registry", "policy", "rollout", "rollback",
-    "new-app", "new-build", "start-build", "cancel-build", "import-image",
-    "tag", "label", "annotate", "expose", "set", "scale", "autoscale",
-    "secrets", "serviceaccounts", "login", "logout", "whoami"
-}
+-- Clink tab-completion for the OpenShift CLI (oc / oc.exe)
 
--- 2. Create the parser by passing the table directly
--- This avoids calling 'add_commands', which no longer exists
-local oc_parser = clink.arg.new_parser(oc_cmds)
+local p = clink.arg.new_parser
 
--- 3. Register the parser
--- Using the stable register_parser which maps to the new engine internally
+-- General resource types (singular, plural, short alias)
+local all_resources = p({
+    "build", "builds",
+    "buildconfig", "buildconfigs", "bc",
+    "clusterrole", "clusterroles",
+    "clusterrolebinding", "clusterrolebindings",
+    "configmap", "configmaps", "cm",
+    "cronjob", "cronjobs", "cj",
+    "daemonset", "daemonsets", "ds",
+    "deployment", "deployments", "deploy",
+    "deploymentconfig", "deploymentconfigs", "dc",
+    "endpoint", "endpoints", "ep",
+    "event", "events",
+    "imagestream", "imagestreams", "is",
+    "imagestreamtag", "imagestreamtags", "istag",
+    "ingress", "ingresses", "ing",
+    "job", "jobs",
+    "namespace", "namespaces", "ns",
+    "networkpolicy", "networkpolicies", "netpol",
+    "node", "nodes", "no",
+    "persistentvolume", "persistentvolumes", "pv",
+    "persistentvolumeclaim", "persistentvolumeclaims", "pvc",
+    "pod", "pods", "po",
+    "replicaset", "replicasets", "rs",
+    "replicationcontroller", "replicationcontrollers", "rc",
+    "role", "roles",
+    "rolebinding", "rolebindings",
+    "route", "routes",
+    "secret", "secrets",
+    "service", "services", "svc",
+    "serviceaccount", "serviceaccounts", "sa",
+    "statefulset", "statefulsets", "sts",
+})
+
+local pod_resources = p({"pod", "pods", "po"})
+
+local scalable = p({
+    "deployment", "deployments", "deploy",
+    "deploymentconfig", "deploymentconfigs", "dc",
+    "replicaset", "replicasets", "rs",
+    "replicationcontroller", "replicationcontrollers", "rc",
+    "statefulset", "statefulsets", "sts",
+})
+
+local rollout_parser = p({
+    "history" .. scalable,
+    "pause"   .. scalable,
+    "restart" .. scalable,
+    "resume"  .. scalable,
+    "status"  .. scalable,
+    "undo"    .. scalable,
+})
+
+local adm_parser = p({
+    "certificate",
+    "cordon",
+    "drain",
+    "groups",
+    "policy",
+    "taint",
+    "top",
+    "uncordon",
+})
+
+local oc_parser = p({
+    "adm"          .. adm_parser,
+    "annotate"     .. all_resources,
+    "apply",
+    "autoscale"    .. scalable,
+    "cancel-build",
+    "create",
+    "delete"       .. all_resources,
+    "describe"     .. all_resources,
+    "edit"         .. all_resources,
+    "exec"         .. pod_resources,
+    "explain"      .. all_resources,
+    "expose"       .. all_resources,
+    "get"          .. all_resources,
+    "image",
+    "import-image",
+    "label"        .. all_resources,
+    "login",
+    "logout",
+    "logs"         .. pod_resources,
+    "new-app",
+    "new-build",
+    "new-project",
+    "policy",
+    "project",
+    "registry",
+    "rollback"     .. scalable,
+    "rollout"      .. rollout_parser,
+    "scale"        .. scalable,
+    "secrets",
+    "serviceaccounts",
+    "set",
+    "start-build",
+    "status",
+    "tag",
+    "whoami",
+})
+
 clink.arg.register_parser("oc", oc_parser)
 clink.arg.register_parser("oc.exe", oc_parser)
