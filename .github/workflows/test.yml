@@ -13,13 +13,13 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up MSVC developer environment
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install Lua 5.1
-        uses: leafo/gh-actions-lua@v10
+        uses: leafo/gh-actions-lua@v13
         with:
           luaVersion: "5.1"
 
