@@ -1,5 +1,7 @@
 # oc-clink-completions
 
+[![Tests](https://github.com/maximunited/oc-clink-completions/actions/workflows/test.yml/badge.svg)](https://github.com/maximunited/oc-clink-completions/actions/workflows/test.yml)
+
 [Clink](https://chrisant996.github.io/clink/) tab-completion script for the OpenShift CLI (`oc` / `oc.exe`).
 
 ## What it does
