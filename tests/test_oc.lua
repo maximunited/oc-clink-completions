@@ -31,6 +31,12 @@ local function assert_has(t, val, ctx)
     end
 end
 
+local function assert_not_has(t, val, ctx)
+    if list_contains(t, val) then
+        error((ctx and (ctx .. ": ") or "") .. "unexpected \"" .. tostring(val) .. "\"", 2)
+    end
+end
+
 -- ── Mock Clink API ────────────────────────────────────────────────────────────
 
 local registered = {}
@@ -39,12 +45,19 @@ local Parser = {}
 Parser.__index = Parser
 
 local function new_parser(args)
-    return setmetatable({ _args = args or {} }, Parser)
+    return setmetatable({ _args = args or {}, _flags = {} }, Parser)
 end
 
 -- "cmd" .. parser  links a completion word to its sub-parser
 Parser.__concat = function(a, b)
     return setmetatable({ _cmd = a, _parser = b }, Parser)
+end
+
+-- Records flags added via parser:set_flags(...)
+function Parser:set_flags(...)
+    for _, f in ipairs({ ... }) do
+        self._flags[#self._flags + 1] = f
+    end
 end
 
 clink = {
@@ -76,7 +89,7 @@ dofile("oc.lua")
 
 -- ── Parser tree helpers ───────────────────────────────────────────────────────
 
--- Collect the command-name strings from a parser's arg list
+-- Collect command-name strings from a parser's positional arg list
 local function cmds(parser)
     local t = {}
     for _, entry in ipairs(parser._args or {}) do
@@ -89,10 +102,32 @@ local function cmds(parser)
     return t
 end
 
--- Return the sub-parser linked to a command word
+-- Return the sub-parser linked to a positional command word
 local function sub(parser, cmd)
     for _, entry in ipairs(parser._args or {}) do
         if type(entry) == "table" and entry._cmd == cmd then
+            return entry._parser
+        end
+    end
+end
+
+-- Collect flag-name strings from a parser's flag list
+local function flags(parser)
+    local t = {}
+    for _, entry in ipairs(parser._flags or {}) do
+        if type(entry) == "string" then
+            t[#t + 1] = entry
+        elseif type(entry) == "table" and type(entry._cmd) == "string" then
+            t[#t + 1] = entry._cmd
+        end
+    end
+    return t
+end
+
+-- Return the sub-parser linked to a flag
+local function flag_sub(parser, flag)
+    for _, entry in ipairs(parser._flags or {}) do
+        if type(entry) == "table" and entry._cmd == flag then
             return entry._parser
         end
     end
@@ -235,7 +270,6 @@ test("names_of: ignores stderr lines (empty after strip)", function()
     popen_stubs["oc get pods"] = { "Error from server", "", "pod/real-pod" }
     local fn    = sub(all_res, "pods")._args[1]
     local names = fn()
-    -- Only "real-pod" survives; error lines have no '/' pattern match
     assert_eq(#names, 1)
     assert_has(names, "real-pod")
     popen_stubs = {}
@@ -254,13 +288,10 @@ test("pod / pods / po all query API resource 'pods'", function()
 end)
 
 test("logs / exec use the pod_names parser (not all_resources)", function()
-    -- logs and exec should NOT have resource-type options like "service"
-    -- they resolve to a flat pod-name parser
     local logs_p = sub(oc, "logs")
     local exec_p = sub(oc, "exec")
-    -- their _args should NOT contain "service" (would mean wrong parser attached)
-    assert(not list_contains(cmds(logs_p), "service"), "logs should not list 'service'")
-    assert(not list_contains(cmds(exec_p), "service"), "exec should not list 'service'")
+    assert_not_has(cmds(logs_p), "service", "logs should not list 'service'")
+    assert_not_has(cmds(exec_p), "service", "exec should not list 'service'")
 end)
 
 test("scalable: deployment alias queries 'deployments'", function()
@@ -270,6 +301,79 @@ test("scalable: deployment alias queries 'deployments'", function()
     assert_has(names, "api")
     assert_has(names, "worker")
     popen_stubs = {}
+end)
+
+-- ── Tests: namespace flag on all_resources ────────────────────────────────────
+
+test("all_resources: -n flag present",          function() assert_has(flags(all_res), "-n")          end)
+test("all_resources: --namespace flag present", function() assert_has(flags(all_res), "--namespace") end)
+
+test("all_resources: -n links to namespace name parser", function()
+    local ns_p = flag_sub(all_res, "-n")
+    assert(ns_p ~= nil, "-n has no linked parser")
+    assert(type(ns_p._args[1]) == "function", "expected dynamic function")
+end)
+
+test("all_resources: namespace names fetched from 'projects'", function()
+    popen_stubs["oc get projects"] = { "project/dev", "project/staging", "project/prod" }
+    local fn    = flag_sub(all_res, "-n")._args[1]
+    local names = fn()
+    assert_has(names, "dev")
+    assert_has(names, "staging")
+    assert_has(names, "prod")
+    popen_stubs = {}
+end)
+
+test("all_resources: --namespace links to same parser as -n", function()
+    assert(flag_sub(all_res, "-n") == flag_sub(all_res, "--namespace"))
+end)
+
+-- ── Tests: namespace flag on pod_names ───────────────────────────────────────
+
+local pod_names_p = sub(oc, "logs")
+
+test("pod_names: -n flag present",          function() assert_has(flags(pod_names_p), "-n")          end)
+test("pod_names: --namespace flag present", function() assert_has(flags(pod_names_p), "--namespace") end)
+
+test("pod_names: -n links to namespace name parser", function()
+    local ns_p = flag_sub(pod_names_p, "-n")
+    assert(ns_p ~= nil)
+    assert(type(ns_p._args[1]) == "function")
+end)
+
+-- ── Tests: namespace flag on scalable ────────────────────────────────────────
+
+test("scalable: -n flag present",          function() assert_has(flags(scalable), "-n")          end)
+test("scalable: --namespace flag present", function() assert_has(flags(scalable), "--namespace") end)
+
+-- ── Tests: namespace flag on per-resource name parsers ───────────────────────
+
+-- res() must add -n to the name-completing sub-parser at every resource level
+for _, alias in ipairs({"pods", "services", "deployments", "dc", "cm"}) do
+    test("name parser for '" .. alias .. "' has -n flag", function()
+        local name_p = sub(all_res, alias)
+        assert(name_p ~= nil, alias .. ": no name parser")
+        assert_has(flags(name_p), "-n", alias)
+    end)
+end
+
+-- ── Tests: namespace names stripped correctly ─────────────────────────────────
+
+test("namespace names: strips 'project/' prefix", function()
+    popen_stubs["oc get projects"] = { "project/alpha", "project/beta" }
+    local fn    = flag_sub(all_res, "-n")._args[1]
+    local names = fn()
+    assert_has(names, "alpha")
+    assert_has(names, "beta")
+    assert_not_has(names, "project/alpha")
+    popen_stubs = {}
+end)
+
+test("namespace names: empty when cluster unreachable", function()
+    popen_stubs = {}
+    local fn    = flag_sub(all_res, "-n")._args[1]
+    local names = fn()
+    assert_eq(#names, 0)
 end)
 
 -- ── Summary ───────────────────────────────────────────────────────────────────

@@ -22,16 +22,6 @@ local function names_of(resource)
     end
 end
 
--- Build a list of "alias .. name-completing-parser" entries for one API type.
-local function res(api_name, ...)
-    local name_p = p({ names_of(api_name) })
-    local t = {}
-    for _, alias in ipairs({ ... }) do
-        t[#t + 1] = alias .. name_p
-    end
-    return t
-end
-
 -- Flatten multiple entry-lists into one table.
 local function merge(...)
     local result = {}
@@ -42,6 +32,26 @@ local function merge(...)
     end
     return result
 end
+
+-- ns_names is referenced inside res(), so declare it before res() is defined.
+-- It is assigned below, before res() is ever called.
+local ns_names
+
+-- Build "alias .. name-completing-parser" entries for one API resource type.
+-- Each name parser also gets -n/--namespace flags so the user can type
+--   oc get pods -n <TAB>   or   oc get pods my-pod -n <TAB>
+local function res(api_name, ...)
+    local name_p = p({ names_of(api_name) })
+    name_p:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
+    local t = {}
+    for _, alias in ipairs({ ... }) do
+        t[#t + 1] = alias .. name_p
+    end
+    return t
+end
+
+-- OCP uses 'projects' as the namespace equivalent.
+ns_names = p({ names_of("projects") })
 
 local all_resources = p(merge(
     res("builds",                  "build",                "builds"),
@@ -75,9 +85,12 @@ local all_resources = p(merge(
     res("services",                "service",              "services",              "svc"),
     res("statefulsets",            "statefulset",          "statefulsets",          "sts")
 ))
+-- Cover "oc get -n <TAB>" (flag before resource type is chosen)
+all_resources:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
 
 -- logs/exec take a pod name directly, no resource-type prefix
 local pod_names = p({ names_of("pods") })
+pod_names:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
 
 local scalable = p(merge(
     res("deployments",             "deployment",           "deployments",           "deploy"),
@@ -86,6 +99,7 @@ local scalable = p(merge(
     res("replicationcontrollers",  "replicationcontroller","replicationcontrollers","rc"),
     res("statefulsets",            "statefulset",          "statefulsets",          "sts")
 ))
+scalable:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
 
 local rollout_parser = p({
     "history" .. scalable,
