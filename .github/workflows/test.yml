@@ -15,8 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Lua
-        run: choco install lua --no-progress -y
+      - name: Set up MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Lua 5.1
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
 
       - name: Run tests
         run: lua tests/test_oc.lua
