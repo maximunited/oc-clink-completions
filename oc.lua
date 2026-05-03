@@ -33,16 +33,19 @@ local function merge(...)
     return result
 end
 
--- ns_names is referenced inside res(), so declare it before res() is defined.
--- It is assigned below, before res() is ever called.
+-- Both ns_names and out_fmts are referenced inside res(); declare before res()
+-- is defined, assign before res() is ever called.
 local ns_names
+local out_fmts
 
 -- Build "alias .. name-completing-parser" entries for one API resource type.
--- Each name parser also gets -n/--namespace flags so the user can type
---   oc get pods -n <TAB>   or   oc get pods my-pod -n <TAB>
+-- Each name parser inherits -n/--namespace and -o/--output flags.
 local function res(api_name, ...)
     local name_p = p({ names_of(api_name) })
-    name_p:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
+    name_p:set_flags(
+        "-n" .. ns_names, "--namespace" .. ns_names,
+        "-o" .. out_fmts,  "--output"    .. out_fmts
+    )
     local t = {}
     for _, alias in ipairs({ ... }) do
         t[#t + 1] = alias .. name_p
@@ -52,6 +55,20 @@ end
 
 -- OCP uses 'projects' as the namespace equivalent.
 ns_names = p({ names_of("projects") })
+
+-- Output formats supported by oc get / describe / apply …
+out_fmts = p({
+    "json",
+    "yaml",
+    "wide",
+    "name",
+    "jsonpath=",
+    "jsonpath-file=",
+    "go-template=",
+    "go-template-file=",
+    "custom-columns=",
+    "custom-columns-file=",
+})
 
 local all_resources = p(merge(
     res("builds",                  "build",                "builds"),
@@ -85,12 +102,18 @@ local all_resources = p(merge(
     res("services",                "service",              "services",              "svc"),
     res("statefulsets",            "statefulset",          "statefulsets",          "sts")
 ))
--- Cover "oc get -n <TAB>" (flag before resource type is chosen)
-all_resources:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
+-- Cover flags before resource type is chosen (e.g. "oc get -n <TAB>")
+all_resources:set_flags(
+    "-n" .. ns_names, "--namespace" .. ns_names,
+    "-o" .. out_fmts,  "--output"    .. out_fmts
+)
 
 -- logs/exec take a pod name directly, no resource-type prefix
 local pod_names = p({ names_of("pods") })
-pod_names:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
+pod_names:set_flags(
+    "-n" .. ns_names, "--namespace" .. ns_names,
+    "-o" .. out_fmts,  "--output"    .. out_fmts
+)
 
 local scalable = p(merge(
     res("deployments",             "deployment",           "deployments",           "deploy"),
@@ -99,7 +122,10 @@ local scalable = p(merge(
     res("replicationcontrollers",  "replicationcontroller","replicationcontrollers","rc"),
     res("statefulsets",            "statefulset",          "statefulsets",          "sts")
 ))
-scalable:set_flags("-n" .. ns_names, "--namespace" .. ns_names)
+scalable:set_flags(
+    "-n" .. ns_names, "--namespace" .. ns_names,
+    "-o" .. out_fmts,  "--output"    .. out_fmts
+)
 
 local rollout_parser = p({
     "history" .. scalable,

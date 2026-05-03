@@ -376,6 +376,56 @@ test("namespace names: empty when cluster unreachable", function()
     assert_eq(#names, 0)
 end)
 
+-- ── Tests: -o / --output flag ────────────────────────────────────────────────
+
+local expected_formats = {
+    "json", "yaml", "wide", "name",
+    "jsonpath=", "jsonpath-file=",
+    "go-template=", "go-template-file=",
+    "custom-columns=", "custom-columns-file=",
+}
+
+-- all_resources carries -o at the resource-type selection level
+test("all_resources: -o flag present",       function() assert_has(flags(all_res), "-o")       end)
+test("all_resources: --output flag present", function() assert_has(flags(all_res), "--output") end)
+
+test("all_resources: -o links to output formats parser", function()
+    local fmt_p = flag_sub(all_res, "-o")
+    assert(fmt_p ~= nil, "-o has no linked parser")
+    for _, fmt in ipairs(expected_formats) do
+        assert_has(cmds(fmt_p), fmt, "-o formats")
+    end
+end)
+
+test("all_resources: --output links to same parser as -o", function()
+    assert(flag_sub(all_res, "-o") == flag_sub(all_res, "--output"))
+end)
+
+-- name parsers (built by res()) also carry -o
+for _, alias in ipairs({"pods", "services", "deployments", "dc", "cm"}) do
+    test("name parser for '" .. alias .. "' has -o flag", function()
+        local name_p = sub(all_res, alias)
+        assert(name_p ~= nil, alias .. ": no name parser")
+        assert_has(flags(name_p), "-o", alias)
+    end)
+end
+
+-- pod_names parser (used by logs/exec) carries -o
+test("pod_names: -o flag present",       function() assert_has(flags(pod_names_p), "-o")       end)
+test("pod_names: --output flag present", function() assert_has(flags(pod_names_p), "--output") end)
+
+test("pod_names: -o links to output formats parser", function()
+    local fmt_p = flag_sub(pod_names_p, "-o")
+    assert(fmt_p ~= nil)
+    for _, fmt in ipairs(expected_formats) do
+        assert_has(cmds(fmt_p), fmt, "pod_names -o formats")
+    end
+end)
+
+-- scalable parser carries -o
+test("scalable: -o flag present",       function() assert_has(flags(scalable), "-o")       end)
+test("scalable: --output flag present", function() assert_has(flags(scalable), "--output") end)
+
 -- ── Summary ───────────────────────────────────────────────────────────────────
 
 io.write(string.format("\n%d passed  %d failed\n", pass, fail))
