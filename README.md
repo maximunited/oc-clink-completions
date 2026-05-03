@@ -24,13 +24,30 @@ set          start-build  status       tag          whoami
 
 ## Installation
 
-Copy `oc.lua` to your Clink scripts directory:
+Clone the repo, then link `oc.lua` into your Clink scripts directory so changes pulled from git take effect immediately.
 
-```cmd
-copy oc.lua %LocalAppData%\clink\
+**Option A — hard link (no admin required, recommended):**
+
+```powershell
+git clone https://github.com/maximunited/oc-clink-completions
+New-Item -ItemType HardLink `
+  -Path "$env:LOCALAPPDATA\clink\oc.lua" `
+  -Target "$PWD\oc-clink-completions\oc.lua"
 ```
 
-Restart your `cmd.exe` session (or run `clink reload` if your version supports it).
+> **Note:** Hard links share the same file data on disk, so in-place edits are reflected immediately. However, `git pull` replaces the file inode, which breaks the link — re-run the `New-Item` command after pulling to restore it.
+
+**Option B — symbolic link (survives `git pull`, requires admin or Developer Mode):**
+
+```powershell
+# Run PowerShell as Administrator, or enable Settings → Developer Mode first
+git clone https://github.com/maximunited/oc-clink-completions
+New-Item -ItemType SymbolicLink `
+  -Path "$env:LOCALAPPDATA\clink\oc.lua" `
+  -Target "$PWD\oc-clink-completions\oc.lua"
+```
+
+Restart your `cmd.exe` session (or run `clink reload`) to pick up the script.
 
 ## Covered subcommands
 
